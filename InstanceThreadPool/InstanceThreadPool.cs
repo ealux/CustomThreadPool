@@ -191,7 +191,7 @@ namespace InstanceThreadPool
 
             _WorkingEvent.Set();                // Step on thread to canel work
             foreach (var thread in _threads)
-                if (!thread.Join(1000))         // Try to sync with thread (1 sec)
+                if (!thread.Join(100))         // Try to sync with thread (100 ms)
                     thread.Interrupt();         // Interrupt thread forcibly
 
             // Free events
