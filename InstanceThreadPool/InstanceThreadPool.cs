@@ -21,8 +21,7 @@ namespace InstanceThreadPool
 
         // Sync primitivies
         private readonly AutoResetEvent _WorkingEvent = new AutoResetEvent(false);
-
-        private readonly AutoResetEvent _QueueLockEvent = new AutoResetEvent(false);
+        private readonly AutoResetEvent _QueueLockEvent = new AutoResetEvent(true);
 
         #endregion [Fields]
 
@@ -120,7 +119,7 @@ namespace InstanceThreadPool
                 var (work, parameter) = _works.Dequeue();   // Take work
 
                 // If taken work was last
-                if(_works.Count == 0)
+                if(_works.Count > 0)
                     _WorkingEvent.Set();                    // Accept next thread to wait a new job in cycle
                 _QueueLockEvent.Set();                      // Release queue access
 
