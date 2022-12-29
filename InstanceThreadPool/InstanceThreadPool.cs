@@ -78,9 +78,14 @@ namespace InstanceThreadPool
         /// <param name="work">Action to do (with parameter)</param>
         public void Run(object parameter, Action<object?> work)
         {
+            // Add work
             _QueueLockEvent.WaitOne();          // Request queue access
-            _works.Enqueue((work, parameter));  // Add new work
+            _works.Enqueue((work, parameter));  // Add new work to queue
             _QueueLockEvent.Set();              // Release queue access
+
+            // Access ThreadWork operation
+            _WorkingEvent.Set();
+
         }
 
         #endregion [Execute section (Public API)]
