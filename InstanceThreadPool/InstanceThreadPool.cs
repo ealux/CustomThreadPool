@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 
 namespace InstanceThreadPool
@@ -13,7 +11,7 @@ namespace InstanceThreadPool
 
         public InstanceThreadPool(int maxThreadCount, ThreadPriority priority = ThreadPriority.Normal, string? Name = null)
         {
-            if(maxThreadCount <= 0)
+            if (maxThreadCount <= 0)
                 throw new ArgumentOutOfRangeException(nameof(maxThreadCount), maxThreadCount, "Thread count must be equal or more then 1");
 
             this._priority = priority;
@@ -33,7 +31,6 @@ namespace InstanceThreadPool
                     Name = name,
                     IsBackground = true,
                     Priority = _priority,
-
                 };
                 _threads[i] = thread;
                 thread.Start();
@@ -42,26 +39,30 @@ namespace InstanceThreadPool
 
         #region [Execute section (Public API)]
 
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="work"></param>
         public void Run(Action work) => Run(null!, _ => work());
 
-        public void Run(object parameter, Action<object> work)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="parameter"></param>
+        /// <param name="work"></param>
+        public void Run(object parameter, Action<object?> work)
         {
-
         }
 
-        #endregion
+        #endregion [Execute section (Public API)]
 
         #region [Worker]
 
-
         private void ThreadWork()
         {
-
             throw new NotImplementedException();
         }
 
-        #endregion
-
+        #endregion [Worker]
     }
 }
