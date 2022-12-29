@@ -105,9 +105,18 @@ namespace InstanceThreadPool
             // Waiting for work access
             while (true)
             {
-                _WorkingEvent.WaitOne();    // Waiting event to allow work
+                // Waiting event to allow work
+                _WorkingEvent.WaitOne();
+                // Request queue access
+                _QueueLockEvent.WaitOne();
 
-                _QueueLockEvent.WaitOne();                  // Request queue access
+                // Check queue state (is any work here)
+                while (_works.Count == 0)                   // If no work ...
+                {
+                    _QueueLockEvent.Set();                  // Release queue access
+                    _WorkingEvent.WaitOne();                // Waiting event to allow work
+                    _QueueLockEvent.WaitOne();              // Block queue access and wait one again
+                }
                 var (work, parameter) = _works.Dequeue();   // Take work
                 _QueueLockEvent.Set();                      // Release queue access
 
