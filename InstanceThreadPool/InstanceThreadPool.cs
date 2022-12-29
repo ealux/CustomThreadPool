@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace InstanceThreadPool
@@ -99,14 +100,26 @@ namespace InstanceThreadPool
         /// </summary>
         private void ThreadWork()
         {
+            var thread_name = Thread.CurrentThread.Name; // Handle current thread name
+
             // Waiting for work access
             while (true)
             {
                 _WorkingEvent.WaitOne();    // Waiting event to allow work
 
-                _QueueLockEvent.WaitOne();                  // Request queue access                                
+                _QueueLockEvent.WaitOne();                  // Request queue access
                 var (work, parameter) = _works.Dequeue();   // Take work
                 _QueueLockEvent.Set();                      // Release queue access
+
+                try
+                {
+                    // Start work
+                    work(parameter);
+                }
+                catch (Exception e)
+                {
+                    Trace.WriteLine($"Error occuried on thread {thread_name}: {e}");
+                }
             }
         }
 
