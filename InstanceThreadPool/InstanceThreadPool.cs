@@ -28,6 +28,12 @@ namespace InstanceThreadPool
 
         #endregion [Fields]
 
+        #region [Properties]
+
+        public string Name => _name ?? GetHashCode().ToString("x");
+
+        #endregion [Properties]
+
         /// <summary>
         /// Create InstanceThreadPool instance
         /// </summary>
@@ -57,7 +63,7 @@ namespace InstanceThreadPool
         {
             for (int i = 0; i < _threads.Length; i++)
             {
-                var name = $"{nameof(InstanceThreadPool)}[{_name ?? GetHashCode().ToString("x")}]-Thread[{i}]";
+                var name = $"{nameof(InstanceThreadPool)}[{Name}]-Thread[{i}]";
                 var thread = new Thread(ThreadWork)
                 {
                     Name = name,
@@ -164,7 +170,7 @@ namespace InstanceThreadPool
             catch (ThreadInterruptedException e)
             {
                 // Trace exception on interrupt
-                Trace.TraceWarning($"Thread was forcibly interrupted on pool {_name ?? GetHashCode().ToString("x")} dispose. " +
+                Trace.TraceWarning($"Thread was forcibly interrupted on pool {Name} dispose. " +
                     $"Error occuried on thread {thread_name}: {e}");
             }
             finally
@@ -183,10 +189,10 @@ namespace InstanceThreadPool
             // Set work flag to non-working state
             _canWork = false;
 
-            _WorkingEvent.Set(); // Step on thread to canel work
+            _WorkingEvent.Set();                // Step on thread to canel work
             foreach (var thread in _threads)
-                if (!thread.Join(1000))  // Try to sync with thread (1 sec)
-                    thread.Interrupt(); // Interrupt thread forcibly
+                if (!thread.Join(1000))         // Try to sync with thread (1 sec)
+                    thread.Interrupt();         // Interrupt thread forcibly
 
             // Free events
             _WorkingEvent.Dispose();
