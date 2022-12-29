@@ -111,51 +111,67 @@ namespace InstanceThreadPool
             var thread_name = Thread.CurrentThread.Name; // Handle current thread name
             Trace.TraceInformation($"Thread {thread_name} started with id {Environment.CurrentManagedThreadId}");   // Tracing on start
 
-            // Waiting for work access
-            while (_canWork)
+            try
             {
-                // Waiting event to allow work
-                _WorkingEvent.WaitOne();
-                // Request queue access
-                _QueueLockEvent.WaitOne();
-
-                // Check queue state (is any work here)
-                while (_works.Count == 0)                   // If no work ...
+                // Waiting for work access
+                while (_canWork)
                 {
-                    _QueueLockEvent.Set();                  // Release queue access
-                    _WorkingEvent.WaitOne();                // Waiting event to allow work
-                    _QueueLockEvent.WaitOne();              // Block queue access and wait one again
-                }
-                var (work, parameter) = _works.Dequeue();   // Take work
+                    // Waiting event to allow work
+                    _WorkingEvent.WaitOne();
+                    // Prevent thread action on pool dispose
+                    if (!_canWork) break;
 
-                // If taken work was last
-                if (_works.Count > 0)
-                    _WorkingEvent.Set();                    // Accept next thread to wait a new job in cycle
-                _QueueLockEvent.Set();                      // Release queue access
+                    // Request queue access
+                    _QueueLockEvent.WaitOne();
 
-                // Tracing on working...
-                Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] is running...");
-                try
-                {
-                    var timer = Stopwatch.StartNew();   // Create timer
+                    // Check queue state (is any work here)
+                    while (_works.Count == 0)                   // If no work ...
+                    {
+                        _QueueLockEvent.Set();                  // Release queue access
+                        _WorkingEvent.WaitOne();                // Waiting event to allow work
+                        if (!_canWork) break;                   // Prevent thread action if pool dispose
+                        _QueueLockEvent.WaitOne();              // Block queue access and wait one again
+                    }
+                    var (work, parameter) = _works.Dequeue();   // Take work
 
-                    // Start work
-                    work(parameter);
+                    // If taken work was last
+                    if (_works.Count > 0)
+                        _WorkingEvent.Set();                    // Accept next thread to wait a new job in cycle
+                    _QueueLockEvent.Set();                      // Release queue access
 
-                    // Stop timer
-                    timer.Stop();
-                    // Tracing on end work
-                    Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] " +
-                        $"complete work with {timer.ElapsedMilliseconds} ms");
-                }
-                catch (Exception e)
-                {
-                    // Trace exception on working
-                    Trace.TraceError($"Error occuried on thread {thread_name}: {e}");
+                    // Tracing on working...
+                    Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] is running...");
+                    try
+                    {
+                        var timer = Stopwatch.StartNew();   // Create timer
+
+                        // Start work
+                        work(parameter);
+
+                        // Stop timer
+                        timer.Stop();
+                        // Tracing on end work
+                        Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] " +
+                            $"complete work with {timer.ElapsedMilliseconds} ms");
+                    }
+                    catch (Exception e)
+                    {
+                        // Trace exception on working
+                        Trace.TraceError($"Error occuried on thread {thread_name}: {e}");
+                    }
                 }
             }
-
-            Trace.TraceInformation($"Thread {thread_name} completed");   // Tracing on end
+            catch (ThreadInterruptedException e)
+            {
+                // Trace exception on interrupt
+                Trace.TraceWarning($"Thread was forcibly interrupted on pool {_name ?? GetHashCode().ToString("x")} dispose. " +
+                    $"Error occuried on thread {thread_name}: {e}");
+            }
+            finally
+            {
+                Trace.TraceInformation($"Thread {thread_name} completed");  // Tracing on end
+                _WorkingEvent.Set();                                        // Accept next thread to end the job
+            }
         }
 
         #endregion [Worker]
@@ -166,6 +182,11 @@ namespace InstanceThreadPool
         {
             // Set work flag to non-working state
             _canWork = false;
+
+            _WorkingEvent.Set(); // Step on thread to canel work
+            foreach (var thread in _threads)
+                if (!thread.Join(1000))  // Try to sync with thread (1 sec)
+                    thread.Interrupt(); // Interrupt thread forcibly
 
             // Free events
             _WorkingEvent.Dispose();
