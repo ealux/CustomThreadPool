@@ -118,6 +118,10 @@ namespace InstanceThreadPool
                     _QueueLockEvent.WaitOne();              // Block queue access and wait one again
                 }
                 var (work, parameter) = _works.Dequeue();   // Take work
+
+                // If taken work was last
+                if(_works.Count == 0)
+                    _WorkingEvent.Set();                    // Accept next thread to wait a new job in cycle
                 _QueueLockEvent.Set();                      // Release queue access
 
                 try
