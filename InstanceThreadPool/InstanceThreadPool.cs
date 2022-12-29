@@ -32,7 +32,10 @@ namespace InstanceThreadPool
         /// <param name="priority">Priority for threads in pool</param>
         /// <param name="Name">Thread pool name</param>
         /// <exception cref="ArgumentOutOfRangeException">Throw if <paramref name="maxThreadCount"/> less or equal zero</exception>
-        public InstanceThreadPool(int maxThreadCount, ThreadPriority priority = ThreadPriority.Normal, string? Name = null)
+        public InstanceThreadPool(
+            int maxThreadCount,
+            ThreadPriority priority = ThreadPriority.Normal,
+            string? Name = null)
         {
             if (maxThreadCount <= 0)
                 throw new ArgumentOutOfRangeException(nameof(maxThreadCount), maxThreadCount, "Thread count must be equal or more then 1");
@@ -85,7 +88,6 @@ namespace InstanceThreadPool
 
             // Access ThreadWork operation
             _WorkingEvent.Set();
-
         }
 
         #endregion [Execute section (Public API)]
@@ -97,7 +99,15 @@ namespace InstanceThreadPool
         /// </summary>
         private void ThreadWork()
         {
-            _WorkingEvent.WaitOne();    // Waiting event to allow work
+            // Waiting for work access
+            while (true)
+            {
+                _WorkingEvent.WaitOne();    // Waiting event to allow work
+
+                _QueueLockEvent.WaitOne();                  // Request queue access                                
+                var (work, parameter) = _works.Dequeue();   // Take work
+                _QueueLockEvent.Set();                      // Release queue access
+            }
         }
 
         #endregion [Worker]
