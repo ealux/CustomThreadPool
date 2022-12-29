@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace InstanceThreadPool
 {
-    public class InstanceThreadPool
+    public class InstanceThreadPool : IDisposable
     {
         #region [Fields]
 
@@ -23,7 +23,8 @@ namespace InstanceThreadPool
 
         private readonly AutoResetEvent _QueueLockEvent = new(true);
 
-        // flag
+        // Dispose pool flag to kill threads (with blocked optimizations)
+        private volatile bool _canWork = true;
 
         #endregion [Fields]
 
@@ -83,8 +84,14 @@ namespace InstanceThreadPool
         /// <param name="work">Action to do (with parameter)</param>
         public void Run(object parameter, Action<object?> work)
         {
+            // Check for working. Block job adding on disposing
+            if (!_canWork)
+                throw new InvalidOperationException("Can not set job. Pool was disposed!");
+
             // Add work
             _QueueLockEvent.WaitOne();          // Request queue access
+            // Check for working. Prevent pre-dispose potential actions
+            if (!_canWork) throw new InvalidOperationException("Can not set job. Pool was disposed!");
             _works.Enqueue((work, parameter));  // Add new work to queue
             _QueueLockEvent.Set();              // Release queue access
 
@@ -105,7 +112,7 @@ namespace InstanceThreadPool
             Trace.TraceInformation($"Thread {thread_name} started with id {Environment.CurrentManagedThreadId}");   // Tracing on start
 
             // Waiting for work access
-            while (true)
+            while (_canWork)
             {
                 // Waiting event to allow work
                 _WorkingEvent.WaitOne();
@@ -143,6 +150,7 @@ namespace InstanceThreadPool
                 }
                 catch (Exception e)
                 {
+                    // Trace exception on working
                     Trace.TraceError($"Error occuried on thread {thread_name}: {e}");
                 }
             }
@@ -151,5 +159,19 @@ namespace InstanceThreadPool
         }
 
         #endregion [Worker]
+
+        #region [IDisposable]
+
+        public void Dispose()
+        {
+            // Set work flag to non-working state
+            _canWork = false;
+
+            // Free events
+            _WorkingEvent.Dispose();
+            _QueueLockEvent.Dispose();
+        }
+
+        #endregion [IDisposable]
     }
 }
