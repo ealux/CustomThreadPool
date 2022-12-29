@@ -16,12 +16,14 @@ namespace InstanceThreadPool
         private readonly Thread[] _threads;
 
         // Works queue
-        private readonly Queue<(Action<object?> Work, object? Parameter)> _works =
-            new Queue<(Action<object?> Work, object? Parameter)>();
+        private readonly Queue<(Action<object?> Work, object? Parameter)> _works = new();
 
         // Sync primitivies
-        private readonly AutoResetEvent _WorkingEvent = new AutoResetEvent(false);
-        private readonly AutoResetEvent _QueueLockEvent = new AutoResetEvent(true);
+        private readonly AutoResetEvent _WorkingEvent = new(false);
+
+        private readonly AutoResetEvent _QueueLockEvent = new(true);
+
+        // flag
 
         #endregion [Fields]
 
@@ -100,6 +102,7 @@ namespace InstanceThreadPool
         private void ThreadWork()
         {
             var thread_name = Thread.CurrentThread.Name; // Handle current thread name
+            Trace.TraceInformation($"Thread {thread_name} started with id {Environment.CurrentManagedThreadId}");   // Tracing on start
 
             // Waiting for work access
             while (true)
@@ -119,20 +122,32 @@ namespace InstanceThreadPool
                 var (work, parameter) = _works.Dequeue();   // Take work
 
                 // If taken work was last
-                if(_works.Count > 0)
+                if (_works.Count > 0)
                     _WorkingEvent.Set();                    // Accept next thread to wait a new job in cycle
                 _QueueLockEvent.Set();                      // Release queue access
 
+                // Tracing on working...
+                Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] is running...");
                 try
                 {
+                    var timer = Stopwatch.StartNew();   // Create timer
+
                     // Start work
                     work(parameter);
+
+                    // Stop timer
+                    timer.Stop();
+                    // Tracing on end work
+                    Trace.TraceInformation($"Thread {thread_name}[id{Environment.CurrentManagedThreadId}] " +
+                        $"complete work with {timer.ElapsedMilliseconds} ms");
                 }
                 catch (Exception e)
                 {
-                    Trace.WriteLine($"Error occuried on thread {thread_name}: {e}");
+                    Trace.TraceError($"Error occuried on thread {thread_name}: {e}");
                 }
             }
+
+            Trace.TraceInformation($"Thread {thread_name} completed");   // Tracing on end
         }
 
         #endregion [Worker]
